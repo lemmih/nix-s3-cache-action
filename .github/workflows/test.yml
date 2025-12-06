@@ -10,6 +10,31 @@ env:
   R2_BUCKET: nix-cache-test
 
 jobs:
+  test-error-no-nix:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Try to setup cache without Nix
+      id: setup
+      uses: ./.github/actions/setup-nix-s3-cache
+      continue-on-error: true
+      with:
+        s3-endpoint: https://example.com
+        bucket: dummy-bucket
+        public-key: dummy:key
+
+    - name: Check that action failed
+      run: |
+        if [ "${{ steps.setup.outcome }}" == "failure" ]; then
+          echo "✅ Action correctly failed without Nix installed"
+        else
+          echo "❌ Action should have failed when Nix is not installed"
+          exit 1
+        fi
+
   test-cache:
     runs-on: ubuntu-24.04
 
