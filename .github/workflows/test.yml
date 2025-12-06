@@ -28,10 +28,16 @@ jobs:
         aws-access-key-id: dummy-key
         aws-secret-access-key: dummy-secret
 
-    - name: Check that action failed
+    - name: Check that action failed with correct error message
       run: |
         if [ "${{ steps.setup.outcome }}" == "failure" ]; then
-          echo "✅ Action correctly failed without Nix installed"
+          ERROR_MSG="${{ steps.setup.outputs.error-message }}"
+          if echo "$ERROR_MSG" | grep -q "Nix is not installed"; then
+            echo "✅ Action correctly failed with informative error message"
+          else
+            echo "❌ Action failed but with wrong error message: $ERROR_MSG"
+            exit 1
+          fi
         else
           echo "❌ Action should have failed when Nix is not installed"
           exit 1
