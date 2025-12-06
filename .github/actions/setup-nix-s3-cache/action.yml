@@ -1,0 +1,38 @@
+name: 'Setup Nix S3 Cache'
+description: 'Configure Nix to use an S3-backed cache with post-build hook for uploading'
+inputs:
+  s3-endpoint:
+    description: 'S3 endpoint URL (e.g., https://s3.amazonaws.com or https://account.r2.cloudflarestorage.com)'
+    required: true
+  bucket:
+    description: 'S3 bucket name for the cache'
+    required: true
+  public-key:
+    description: 'Public key for the cache'
+    required: true
+  private-key:
+    description: 'Private key for signing uploads (optional, if not provided, no signing)'
+    required: false
+  aws-access-key-id:
+    description: 'AWS access key ID (optional, uses AWS_ACCESS_KEY_ID env if not provided)'
+    required: false
+  aws-secret-access-key:
+    description: 'AWS secret access key (optional, uses AWS_SECRET_ACCESS_KEY env if not provided)'
+    required: false
+  region:
+    description: 'AWS region (optional, uses AWS_DEFAULT_REGION or AWS_REGION env if not provided)'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure Nix for S3 cache
+      shell: bash
+      env:
+        INPUT_S3_ENDPOINT: ${{ inputs.s3-endpoint }}
+        INPUT_BUCKET: ${{ inputs.bucket }}
+        INPUT_PUBLIC_KEY: ${{ inputs.public-key }}
+        INPUT_PRIVATE_KEY: ${{ inputs.private-key }}
+        INPUT_AWS_ACCESS_KEY_ID: ${{ inputs.aws-access-key-id }}
+        INPUT_AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-access-key }}
+        INPUT_REGION: ${{ inputs.region }}
+      run: bash $GITHUB_ACTION_PATH/setup.sh

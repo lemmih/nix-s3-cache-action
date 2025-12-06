@@ -1,0 +1,132 @@
+name: Test Nix S3 Cache Action
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  R2_BUCKET: nix-cache-test
+
+jobs:
+  test-error-no-nix:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Try to setup cache without Nix
+      id: setup
+      run: |
+        export INPUT_S3_ENDPOINT="https://example.com"
+        export INPUT_BUCKET="dummy-bucket"
+        export INPUT_PUBLIC_KEY="dummy:key"
+        export INPUT_AWS_ACCESS_KEY_ID="dummy-key"
+        export INPUT_AWS_SECRET_ACCESS_KEY="dummy-secret"
+        if output=$(bash .github/actions/setup-nix-s3-cache/setup.sh 2>&1); then
+          echo "should_have_failed=true" >> $GITHUB_OUTPUT
+          echo "output=$output" >> $GITHUB_OUTPUT
+        else
+          echo "should_have_failed=false" >> $GITHUB_OUTPUT
+          echo "output=$output" >> $GITHUB_OUTPUT
+        fi
+      continue-on-error: true
+
+    - name: Check that script failed with correct error message
+      run: |
+        if [ "${{ steps.setup.outputs.should_have_failed }}" == "false" ]; then
+          if echo "${{ steps.setup.outputs.output }}" | grep -q "Nix is not installed"; then
+            echo "✅ Script correctly failed with informative error message"
+          else
+            echo "❌ Script failed but with wrong error message: ${{ steps.setup.outputs.output }}"
+            exit 1
+          fi
+        else
+          echo "❌ Script should have failed when Nix is not installed"
+          exit 1
+        fi
+
+  test-error-missing-bucket:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Determinate Nix
+      uses: DeterminateSystems/nix-installer-action@main
+
+    - name: Try to setup cache with non-existent bucket
+      id: setup
+      run: |
+        export INPUT_S3_ENDPOINT="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+        export INPUT_BUCKET="non-existent-bucket-12345"
+        export INPUT_PUBLIC_KEY="dummy:key"
+        export INPUT_AWS_ACCESS_KEY_ID="${{ secrets.R2_ACCESS_KEY_ID }}"
+        export INPUT_AWS_SECRET_ACCESS_KEY="${{ secrets.R2_SECRET_ACCESS_KEY }}"
+        if output=$(bash .github/actions/setup-nix-s3-cache/setup.sh 2>&1); then
+          echo "should_have_failed=true" >> $GITHUB_OUTPUT
+          echo "output=$output" >> $GITHUB_OUTPUT
+        else
+          echo "should_have_failed=false" >> $GITHUB_OUTPUT
+          echo "output=$output" >> $GITHUB_OUTPUT
+        fi
+      continue-on-error: true
+
+    - name: Check that script failed with bucket error
+      run: |
+        if [ "${{ steps.setup.outputs.should_have_failed }}" == "false" ]; then
+          if echo "${{ steps.setup.outputs.output }}" | grep -q "bucket.*does not exist"; then
+            echo "✅ Script correctly failed with bucket error message"
+          else
+            echo "❌ Script failed but with wrong error message: ${{ steps.setup.outputs.output }}"
+            exit 1
+          fi
+        else
+          echo "❌ Script should have failed with non-existent bucket"
+          exit 1
+        fi
+
+  test-cache:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Determinate Nix
+      uses: DeterminateSystems/nix-installer-action@main
+
+    - name: Setup Nix S3 Cache
+      uses: ./.github/actions/setup-nix-s3-cache
+      with:
+        s3-endpoint: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        bucket: ${{ env.R2_BUCKET }}
+        public-key: ${{ secrets.NIX_CACHE_PUBLIC_KEY }}
+        private-key: ${{ secrets.NIX_CACHE_PRIVATE_KEY }}
+        aws-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+
+    - name: Build test package
+      run: nix build nixpkgs#hello
+      timeout-minutes: 10
+
+    - name: Verify cache upload
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      run: |
+        # Wait a moment for upload to complete
+        sleep 5
+        
+        # List objects in the bucket to verify upload
+        OBJECT_COUNT=$(aws s3 ls s3://${{ env.R2_BUCKET }}/ --endpoint-url https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com --recursive | wc -l)
+        
+        if [ "$OBJECT_COUNT" -gt 0 ]; then
+          echo "✅ Cache upload successful: $OBJECT_COUNT objects found in bucket"
+        else
+          echo "❌ Cache upload failed: no objects found in bucket"
+          exit 1
+        fi
