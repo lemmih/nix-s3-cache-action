@@ -26,11 +26,11 @@ jobs:
         export INPUT_AWS_ACCESS_KEY_ID="dummy-key"
         export INPUT_AWS_SECRET_ACCESS_KEY="dummy-secret"
         if output=$(bash .github/test-error.sh 2>&1); then
-          echo "::set-output name=should_have_failed::true"
-          echo "::set-output name=output::$output"
+          echo "should_have_failed=true" >> $GITHUB_OUTPUT
+          echo "output=$output" >> $GITHUB_OUTPUT
         else
-          echo "::set-output name=should_have_failed::false"
-          echo "::set-output name=output::$output"
+          echo "should_have_failed=false" >> $GITHUB_OUTPUT
+          echo "output=$output" >> $GITHUB_OUTPUT
         fi
       continue-on-error: true
 
