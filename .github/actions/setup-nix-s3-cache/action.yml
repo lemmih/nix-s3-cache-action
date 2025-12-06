@@ -38,6 +38,12 @@ runs:
       run: |
         set -eu
 
+        # Check if Nix is installed
+        if ! command -v nix >/dev/null 2>&1; then
+          echo "Error: Nix is not installed. Please install Nix first using DeterminateSystems/nix-installer-action (https://github.com/DeterminateSystems/nix-installer-action)."
+          exit 1
+        fi
+
         # Determine config file
         if [ -f /etc/nix/nix.custom.conf ]; then
           CONFIG_FILE="/etc/nix/nix.custom.conf"
