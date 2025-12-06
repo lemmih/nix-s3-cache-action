@@ -25,6 +25,8 @@ jobs:
         s3-endpoint: https://example.com
         bucket: dummy-bucket
         public-key: dummy:key
+        aws-access-key-id: dummy-key
+        aws-secret-access-key: dummy-secret
 
     - name: Check that action failed
       run: |
