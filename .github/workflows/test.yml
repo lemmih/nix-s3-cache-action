@@ -25,7 +25,7 @@ jobs:
         export INPUT_PUBLIC_KEY="dummy:key"
         export INPUT_AWS_ACCESS_KEY_ID="dummy-key"
         export INPUT_AWS_SECRET_ACCESS_KEY="dummy-secret"
-        if output=$(bash .github/test-error.sh 2>&1); then
+        if output=$(bash .github/actions/setup-nix-s3-cache/setup.sh 2>&1); then
           echo "should_have_failed=true" >> $GITHUB_OUTPUT
           echo "output=$output" >> $GITHUB_OUTPUT
         else
@@ -66,7 +66,7 @@ jobs:
         export INPUT_PUBLIC_KEY="dummy:key"
         export INPUT_AWS_ACCESS_KEY_ID="${{ secrets.R2_ACCESS_KEY_ID }}"
         export INPUT_AWS_SECRET_ACCESS_KEY="${{ secrets.R2_SECRET_ACCESS_KEY }}"
-        if output=$(bash .github/test-error.sh 2>&1); then
+        if output=$(bash .github/actions/setup-nix-s3-cache/setup.sh 2>&1); then
           echo "should_have_failed=true" >> $GITHUB_OUTPUT
           echo "output=$output" >> $GITHUB_OUTPUT
         else
