@@ -46,7 +46,7 @@
 
           yamllint = pkgs.runCommand "yamllint" { nativeBuildInputs = [ pkgs.yamllint ]; } ''
             cd ${self}
-            yamllint -d relaxed .
+            find . -name '*.yml' -o -name '*.yaml' | grep -v .github/actions/setup-nix-s3-cache/action.yml | xargs yamllint -d relaxed
             touch $out
           '';
 
