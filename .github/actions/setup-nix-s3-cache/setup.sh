@@ -33,7 +33,7 @@ if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
   export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION
 
   # Check if bucket exists
-  if ! aws s3 ls "s3://${INPUT_BUCKET}/" --endpoint-url "${INPUT_S3_ENDPOINT}" >/dev/null 2>&1; then
+  if ! aws s3 ls "s3://${INPUT_BUCKET}/" --endpoint-url "https://${INPUT_S3_ENDPOINT}" >/dev/null 2>&1; then
     echo "Error: S3 bucket '${INPUT_BUCKET}' does not exist or is not accessible with the provided credentials."
     exit 1
   fi
