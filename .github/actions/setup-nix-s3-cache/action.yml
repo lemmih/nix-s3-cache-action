@@ -30,4 +30,13 @@ runs:
    steps:
     - name: Configure Nix for S3 cache
       shell: bash
-      run: 'bash $GITHUB_ACTION_PATH/setup.sh --s3-endpoint ${{ inputs.s3-endpoint }} --bucket ${{ inputs.bucket }} --public-key ${{ inputs.public-key }} --private-key ${{ inputs.private-key }} --aws-access-key-id ${{ inputs.aws-access-key-id }} --aws-secret-access-key ${{ inputs.aws-secret-access-key }} --region ${{ inputs.region }} --create-bucket ${{ inputs.create-bucket }}'
+      run: |
+        bash $GITHUB_ACTION_PATH/setup.sh \
+          --s3-endpoint ${{ inputs.s3-endpoint }} \
+          --bucket ${{ inputs.bucket }} \
+          --public-key ${{ inputs.public-key }} \
+          --private-key ${{ inputs.private-key }} \
+          --aws-access-key-id ${{ inputs.aws-access-key-id }} \
+          --aws-secret-access-key ${{ inputs.aws-secret-access-key }} \
+          --region ${{ inputs.region }} \
+          --create-bucket ${{ inputs.create-bucket }}
