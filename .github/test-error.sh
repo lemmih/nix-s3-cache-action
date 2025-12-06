@@ -29,6 +29,15 @@ if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
     "region = ${AWS_DEFAULT_REGION}" \
     | sudo tee /root/.aws/credentials > /dev/null
   sudo chmod 600 /root/.aws/credentials
+
+  # Export for AWS CLI usage
+  export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION
+
+  # Check if bucket exists
+  if ! aws s3 ls "s3://${INPUT_BUCKET}/" --endpoint-url "${INPUT_S3_ENDPOINT}" >/dev/null 2>&1; then
+    echo "Error: S3 bucket '${INPUT_BUCKET}' does not exist or is not accessible with the provided credentials." >&2
+    exit 1
+  fi
 fi
 
 # Create signing key file if provided
