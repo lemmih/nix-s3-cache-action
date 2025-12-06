@@ -25,8 +25,8 @@ if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
     '[default]' \
     "aws_access_key_id = ${AWS_ACCESS_KEY_ID}" \
     "aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}" \
-    "region = ${AWS_DEFAULT_REGION}" \
-    | sudo tee /root/.aws/credentials > /dev/null
+    "region = ${AWS_DEFAULT_REGION}" |
+    sudo tee /root/.aws/credentials >/dev/null
   sudo chmod 600 /root/.aws/credentials
 
   # Export for AWS CLI usage
@@ -41,7 +41,7 @@ fi
 
 # Create signing key file if provided
 if [ -n "$INPUT_PRIVATE_KEY" ]; then
-  sudo tee /etc/nix/cache-priv-key.pem > /dev/null <<< "$INPUT_PRIVATE_KEY"
+  sudo tee /etc/nix/cache-priv-key.pem >/dev/null <<<"$INPUT_PRIVATE_KEY"
   sudo chmod 644 /etc/nix/cache-priv-key.pem
   SECRET_KEY_PARAM="&secret-key=/etc/nix/cache-priv-key.pem"
 else
@@ -49,6 +49,7 @@ else
 fi
 
 # Create post-build hook
+# shellcheck disable=SC2016 # Single quotes intentional - variables should expand at runtime, not now
 printf '%s\n' \
   '#!/bin/bash' \
   'set -eu' \
@@ -59,12 +60,12 @@ printf '%s\n' \
   "export AWS_DEFAULT_REGION=\"${AWS_DEFAULT_REGION}\"" \
   '' \
   'echo "Uploading to S3: $OUT_PATHS"' \
-  "exec /nix/var/nix/profiles/default/bin/nix copy --to \"s3://${INPUT_BUCKET}?endpoint=${INPUT_S3_ENDPOINT}${SECRET_KEY_PARAM}&compression=zstd\" \$OUT_PATHS" \
-  | sudo tee /etc/nix/post-build-hook.sh > /dev/null
+  "exec /nix/var/nix/profiles/default/bin/nix copy --to \"s3://${INPUT_BUCKET}?endpoint=${INPUT_S3_ENDPOINT}${SECRET_KEY_PARAM}&compression=zstd\" \$OUT_PATHS" |
+  sudo tee /etc/nix/post-build-hook.sh >/dev/null
 sudo chmod +x /etc/nix/post-build-hook.sh
 
 # Configure Nix
-sudo tee -a "$CONFIG_FILE" > /dev/null << EOF
+sudo tee -a "$CONFIG_FILE" >/dev/null <<EOF
 extra-substituters = s3://${INPUT_BUCKET}?endpoint=${INPUT_S3_ENDPOINT}
 extra-trusted-public-keys = ${INPUT_PUBLIC_KEY}
 post-build-hook = /etc/nix/post-build-hook.sh

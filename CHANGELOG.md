@@ -21,6 +21,7 @@ When merging a PR, add an entry to the `[Unreleased]` section under the appropri
 - **Security** for vulnerability fixes
 
 Each entry should:
+
 1. Be a concise description of the change
 2. Include a link to the PR in the format `([#123](link-to-pr))`
 3. Credit the contributor if applicable with `@username`
@@ -35,6 +36,7 @@ Each entry should:
 ### Creating a Release
 
 When creating a new release:
+
 1. Create a new section with the version number and date: `## [1.0.0] - 2024-01-15`
 2. Move all items from `[Unreleased]` to this new section
 3. Update the links at the bottom of the file
