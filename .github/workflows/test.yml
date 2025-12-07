@@ -133,8 +133,6 @@ jobs:
 
   test-create-bucket:
     runs-on: ubuntu-24.04
-    # Only run on pushes to main (not PRs) since PRs from forks don't have access to secrets
-    if: github.event_name == 'push'
 
     steps:
     - name: Checkout code
