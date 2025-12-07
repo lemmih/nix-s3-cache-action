@@ -26,7 +26,7 @@ jobs:
         export INPUT_PUBLIC_KEY="dummy:key"
         export INPUT_AWS_ACCESS_KEY_ID="dummy-key"
         export INPUT_AWS_SECRET_ACCESS_KEY="dummy-secret"
-        if output=$(bash .github/actions/setup-nix-s3-cache/setup.sh 2>&1); then
+        if output=$(bash setup.sh 2>&1); then
           echo "should_have_failed=true" >> "$GITHUB_OUTPUT"
           echo "output=$output" >> "$GITHUB_OUTPUT"
         else
@@ -67,7 +67,7 @@ jobs:
         export INPUT_PUBLIC_KEY="dummy:key"
         export INPUT_AWS_ACCESS_KEY_ID="${{ secrets.R2_ACCESS_KEY_ID }}"
         export INPUT_AWS_SECRET_ACCESS_KEY="${{ secrets.R2_SECRET_ACCESS_KEY }}"
-        if output=$(bash .github/actions/setup-nix-s3-cache/setup.sh 2>&1); then
+        if output=$(bash setup.sh 2>&1); then
           echo "should_have_failed=true" >> "$GITHUB_OUTPUT"
           echo "output=$output" >> "$GITHUB_OUTPUT"
         else
@@ -101,7 +101,7 @@ jobs:
       uses: DeterminateSystems/nix-installer-action@e4fb5e65d88bc1ed7f248eda4e6645126ed90438 # main
 
     - name: Setup Nix S3 Cache
-      uses: ./.github/actions/setup-nix-s3-cache
+      uses: ./
       with:
         s3-endpoint: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         bucket: ${{ env.R2_BUCKET }}
@@ -146,7 +146,7 @@ jobs:
       run: echo "name=nix-cache-test-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
 
     - name: Setup Nix S3 Cache with create-bucket
-      uses: ./.github/actions/setup-nix-s3-cache
+      uses: ./
       with:
         s3-endpoint: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         bucket: ${{ steps.bucket.outputs.name }}
@@ -201,7 +201,7 @@ jobs:
       uses: DeterminateSystems/nix-installer-action@e4fb5e65d88bc1ed7f248eda4e6645126ed90438 # main
 
     - name: Setup Nix S3 Cache with AWS
-      uses: ./.github/actions/setup-nix-s3-cache
+      uses: ./
       with:
         s3-endpoint: s3.amazonaws.com
         bucket: ${{ env.AWS_BUCKET }}
@@ -232,7 +232,7 @@ jobs:
       uses: DeterminateSystems/nix-installer-action@e4fb5e65d88bc1ed7f248eda4e6645126ed90438 # main
 
     - name: Setup Nix S3 Cache with Tebi
-      uses: ./.github/actions/setup-nix-s3-cache
+      uses: ./
       with:
         s3-endpoint: s3.tebi.io
         bucket: nix-cache-test

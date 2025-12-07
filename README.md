@@ -72,7 +72,7 @@ jobs:
           role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsNixCache
           aws-region: us-east-1
 
-      - uses: lemmih/nix-s3-cache/.github/actions/setup-nix-s3-cache@main
+      - uses: lemmih/nix-s3-cache@main
         with:
           s3-endpoint: s3.amazonaws.com
           bucket: my-nix-cache
@@ -113,7 +113,7 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@main
 
-      - uses: lemmih/nix-s3-cache/.github/actions/setup-nix-s3-cache@main
+      - uses: lemmih/nix-s3-cache@main
         with:
           s3-endpoint: s3.amazonaws.com
           bucket: my-nix-cache
@@ -137,7 +137,7 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@main
 
-      - uses: lemmih/nix-s3-cache/.github/actions/setup-nix-s3-cache@main
+      - uses: lemmih/nix-s3-cache@main
         with:
           s3-endpoint: ${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com
           bucket: nix-cache
@@ -162,7 +162,7 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@main
 
-      - uses: lemmih/nix-s3-cache/.github/actions/setup-nix-s3-cache@main
+      - uses: lemmih/nix-s3-cache@main
         with:
           s3-endpoint: s3.tebi.io
           bucket: nix-cache
