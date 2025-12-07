@@ -73,13 +73,15 @@ DERIVATION_NAME="nix-s3-cache-test-${RUN_ID}"
 DERIVATION_FILE=$(mktemp --suffix=.nix)
 trap 'rm -f "$DERIVATION_FILE"' EXIT
 
+# Use a proper derivation with coreutils for sleep
 cat >"$DERIVATION_FILE" <<EOF
-derivation {
-  name = "${DERIVATION_NAME}";
-  system = builtins.currentSystem;
-  builder = "/bin/sh";
-  args = [ "-c" "sleep ${SLEEP_DURATION} && echo test-output > \$out" ];
-}
+let
+  pkgs = import <nixpkgs> {};
+in
+pkgs.runCommand "${DERIVATION_NAME}" {} ''
+  \${pkgs.coreutils}/bin/sleep ${SLEEP_DURATION}
+  echo "test-output-${RUN_ID}" > \$out
+''
 EOF
 
 build_slow_derivation() {
@@ -87,7 +89,7 @@ build_slow_derivation() {
   local start_time end_time duration
 
   start_time=$(date +%s)
-  nix build --impure --no-link --print-out-paths --file "$DERIVATION_FILE"
+  nix-build --no-out-link "$DERIVATION_FILE"
   end_time=$(date +%s)
   duration=$((end_time - start_time))
 
@@ -96,7 +98,7 @@ build_slow_derivation() {
 }
 
 get_store_path() {
-  nix build --impure --no-link --print-out-paths --file "$DERIVATION_FILE"
+  nix-build --no-out-link "$DERIVATION_FILE"
 }
 
 # Test 1: Build and upload to cache
@@ -189,7 +191,7 @@ test_cache_fetch_timing() {
   start_time=$(date +%s)
 
   # Rebuild - this should fetch from cache
-  nix build --impure --no-link --file "$DERIVATION_FILE"
+  nix-build --no-out-link "$DERIVATION_FILE"
 
   end_time=$(date +%s)
   duration=$((end_time - start_time))
