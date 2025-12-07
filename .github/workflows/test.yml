@@ -8,6 +8,7 @@ on:
 
 env:
   R2_BUCKET: nix-cache-test
+  AWS_BUCKET: nix-cache-test-lemmih
 
 jobs:
   test-error-no-nix:
@@ -188,6 +189,68 @@ jobs:
         aws s3 rm s3://${{ steps.bucket.outputs.name }}/ --endpoint-url https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com --recursive || true
         # Delete the bucket
         aws s3 rb s3://${{ steps.bucket.outputs.name }} --endpoint-url https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com || true
+
+  test-cache-aws:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::893216290718:role/github-s3
+        aws-region: us-east-2
+
+    - name: Install Determinate Nix
+      uses: DeterminateSystems/nix-installer-action@e4fb5e65d88bc1ed7f248eda4e6645126ed90438 # main
+
+    - name: Setup Nix S3 Cache with AWS
+      uses: ./.github/actions/setup-nix-s3-cache
+      with:
+        s3-endpoint: s3.amazonaws.com
+        bucket: ${{ env.AWS_BUCKET }}
+        public-key: ${{ secrets.NIX_CACHE_PUBLIC_KEY }}
+        private-key: ${{ secrets.NIX_CACHE_PRIVATE_KEY }}
+
+    - name: Build unique test derivation
+      run: |
+        # Build a unique derivation that won't be in any cache
+        # This ensures the post-build hook is triggered
+        nix build --impure --expr "
+          derivation {
+            name = \"nix-s3-cache-test-${{ github.run_id }}\";
+            system = builtins.currentSystem;
+            builder = \"/bin/sh\";
+            args = [ \"-c\" \"echo 'Test derivation for run ${{ github.run_id }}' > \$out\" ];
+          }
+        "
+      timeout-minutes: 10
+
+    - name: Verify cache upload
+      run: |
+        # Wait a moment for upload to complete
+        sleep 5
+
+        # List objects in the bucket to verify upload
+        OBJECT_COUNT=$(aws s3 ls s3://${{ env.AWS_BUCKET }}/ --recursive | wc -l)
+
+        if [ "$OBJECT_COUNT" -gt 0 ]; then
+          echo "✅ Cache upload successful: $OBJECT_COUNT objects found in bucket"
+        else
+          echo "❌ Cache upload failed: no objects found in bucket"
+          exit 1
+        fi
+
+    - name: Cleanup test objects
+      if: always()
+      run: |
+        # Delete test objects from bucket to keep it clean
+        aws s3 rm s3://${{ env.AWS_BUCKET }}/ --recursive || true
 
   test-cache-tebi:
     runs-on: ubuntu-24.04
