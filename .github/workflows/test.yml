@@ -188,3 +188,45 @@ jobs:
         aws s3 rm s3://${{ steps.bucket.outputs.name }}/ --endpoint-url https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com --recursive || true
         # Delete the bucket
         aws s3 rb s3://${{ steps.bucket.outputs.name }} --endpoint-url https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com || true
+
+  test-cache-tebi:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Determinate Nix
+      uses: DeterminateSystems/nix-installer-action@e4fb5e65d88bc1ed7f248eda4e6645126ed90438 # main
+
+    - name: Setup Nix S3 Cache with Tebi
+      uses: ./.github/actions/setup-nix-s3-cache
+      with:
+        s3-endpoint: s3.tebi.io
+        bucket: nix-cache-test
+        public-key: ${{ secrets.NIX_CACHE_PUBLIC_KEY }}
+        private-key: ${{ secrets.NIX_CACHE_PRIVATE_KEY }}
+        aws-access-key-id: ${{ secrets.TEBI_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.TEBI_SECRET_ACCESS_KEY }}
+
+    - name: Build test package
+      run: nix build nixpkgs#hello
+      timeout-minutes: 10
+
+    - name: Verify cache upload
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.TEBI_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.TEBI_SECRET_ACCESS_KEY }}
+      run: |
+        # Wait a moment for upload to complete
+        sleep 5
+
+        # List objects in the bucket to verify upload
+        OBJECT_COUNT=$(aws s3 ls s3://nix-cache-test/ --endpoint-url https://s3.tebi.io --recursive | wc -l)
+
+        if [ "$OBJECT_COUNT" -gt 0 ]; then
+          echo "✅ Cache upload successful: $OBJECT_COUNT objects found in bucket"
+        else
+          echo "❌ Cache upload failed: no objects found in bucket"
+          exit 1
+        fi
