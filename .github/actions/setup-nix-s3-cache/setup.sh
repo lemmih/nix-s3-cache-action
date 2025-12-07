@@ -15,23 +15,31 @@ else
 fi
 
 # Set AWS credentials
-AWS_ACCESS_KEY_ID="${INPUT_AWS_ACCESS_KEY_ID:-${AWS_ACCESS_KEY_ID}}"
-AWS_SECRET_ACCESS_KEY="${INPUT_AWS_SECRET_ACCESS_KEY:-${AWS_SECRET_ACCESS_KEY}}"
+AWS_ACCESS_KEY_ID="${INPUT_AWS_ACCESS_KEY_ID:-${AWS_ACCESS_KEY_ID:-}}"
+AWS_SECRET_ACCESS_KEY="${INPUT_AWS_SECRET_ACCESS_KEY:-${AWS_SECRET_ACCESS_KEY:-}}"
+AWS_SESSION_TOKEN="${INPUT_AWS_SESSION_TOKEN:-${AWS_SESSION_TOKEN:-}}"
 AWS_DEFAULT_REGION="${INPUT_REGION:-${AWS_DEFAULT_REGION:-${AWS_REGION:-us-east-1}}}"
 INPUT_CREATE_BUCKET="${INPUT_CREATE_BUCKET:-false}"
 
 if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
   sudo mkdir -p /root/.aws
-  printf '%s\n' \
-    '[default]' \
-    "aws_access_key_id = ${AWS_ACCESS_KEY_ID}" \
-    "aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}" \
-    "region = ${AWS_DEFAULT_REGION}" |
-    sudo tee /root/.aws/credentials >/dev/null
+  {
+    printf '%s\n' \
+      '[default]' \
+      "aws_access_key_id = ${AWS_ACCESS_KEY_ID}" \
+      "aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}" \
+      "region = ${AWS_DEFAULT_REGION}"
+    if [ -n "$AWS_SESSION_TOKEN" ]; then
+      printf '%s\n' "aws_session_token = ${AWS_SESSION_TOKEN}"
+    fi
+  } | sudo tee /root/.aws/credentials >/dev/null
   sudo chmod 600 /root/.aws/credentials
 
   # Export for AWS CLI usage
   export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION
+  if [ -n "$AWS_SESSION_TOKEN" ]; then
+    export AWS_SESSION_TOKEN
+  fi
 
   # Check if bucket exists
   if ! aws s3 ls "s3://${INPUT_BUCKET}/" --endpoint-url "https://${INPUT_S3_ENDPOINT}" >/dev/null 2>&1; then
@@ -56,18 +64,23 @@ fi
 
 # Create post-build hook
 # shellcheck disable=SC2016 # Single quotes intentional - variables should expand at runtime, not now
-printf '%s\n' \
-  '#!/bin/bash' \
-  'set -eu' \
-  'set -o pipefail' \
-  '' \
-  "export AWS_ACCESS_KEY_ID=\"${AWS_ACCESS_KEY_ID}\"" \
-  "export AWS_SECRET_ACCESS_KEY=\"${AWS_SECRET_ACCESS_KEY}\"" \
-  "export AWS_DEFAULT_REGION=\"${AWS_DEFAULT_REGION}\"" \
-  '' \
-  'echo "Uploading to S3: $OUT_PATHS"' \
-  "exec /nix/var/nix/profiles/default/bin/nix copy --to \"s3://${INPUT_BUCKET}?endpoint=${INPUT_S3_ENDPOINT}${SECRET_KEY_PARAM}&compression=zstd\" \$OUT_PATHS" |
-  sudo tee /etc/nix/post-build-hook.sh >/dev/null
+{
+  printf '%s\n' \
+    '#!/bin/bash' \
+    'set -eu' \
+    'set -o pipefail' \
+    '' \
+    "export AWS_ACCESS_KEY_ID=\"${AWS_ACCESS_KEY_ID}\"" \
+    "export AWS_SECRET_ACCESS_KEY=\"${AWS_SECRET_ACCESS_KEY}\"" \
+    "export AWS_DEFAULT_REGION=\"${AWS_DEFAULT_REGION}\""
+  if [ -n "$AWS_SESSION_TOKEN" ]; then
+    printf '%s\n' "export AWS_SESSION_TOKEN=\"${AWS_SESSION_TOKEN}\""
+  fi
+  printf '%s\n' \
+    '' \
+    'echo "Uploading to S3: $OUT_PATHS"' \
+    "exec /nix/var/nix/profiles/default/bin/nix copy --to \"s3://${INPUT_BUCKET}?endpoint=${INPUT_S3_ENDPOINT}${SECRET_KEY_PARAM}&compression=zstd\" \$OUT_PATHS"
+} | sudo tee /etc/nix/post-build-hook.sh >/dev/null
 sudo chmod +x /etc/nix/post-build-hook.sh
 
 # Configure Nix
