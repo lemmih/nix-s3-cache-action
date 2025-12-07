@@ -1,4 +1,4 @@
-# nix-s3-cache 🚀
+# nix-s3-cache-action 🚀
 
 We love Nix! ❄️ Reproducible builds, declarative configs, and that warm fuzzy feeling when `nix build` just works.
 
@@ -14,7 +14,7 @@ There are other great caching solutions out there:
 - **[Magic Nix Cache](https://github.com/DeterminateSystems/magic-nix-cache)** - Zero-config caching using GitHub Actions cache. Super convenient, but limited to 10 GiB and artifacts expire after 7 days.
 - **[FlakeHub Cache](https://flakehub.com/)** - Integrated with FlakeHub's flake registry. Nice if you're already in that ecosystem.
 
-**nix-s3-cache** gives you full control over your cache with any S3-compatible storage. Bring your own bucket, pay only for what you use (or nothing at all with free tiers! 🎉).
+**nix-s3-cache-action** gives you full control over your cache with any S3-compatible storage. Bring your own bucket, pay only for what you use (or nothing at all with free tiers! 🎉).
 
 ## 💸 S3 Providers with Free Tiers
 
@@ -72,7 +72,7 @@ jobs:
           role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsNixCache
           aws-region: us-east-1
 
-      - uses: lemmih/nix-s3-cache@main
+      - uses: lemmih/nix-s3-cache-action@main
         with:
           s3-endpoint: s3.amazonaws.com
           bucket: my-nix-cache
@@ -113,7 +113,7 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@main
 
-      - uses: lemmih/nix-s3-cache@main
+      - uses: lemmih/nix-s3-cache-action@main
         with:
           s3-endpoint: s3.amazonaws.com
           bucket: my-nix-cache
@@ -137,7 +137,7 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@main
 
-      - uses: lemmih/nix-s3-cache@main
+      - uses: lemmih/nix-s3-cache-action@main
         with:
           s3-endpoint: ${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com
           bucket: nix-cache
@@ -162,7 +162,7 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@main
 
-      - uses: lemmih/nix-s3-cache@main
+      - uses: lemmih/nix-s3-cache-action@main
         with:
           s3-endpoint: s3.tebi.io
           bucket: nix-cache
