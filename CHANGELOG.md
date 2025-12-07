@@ -44,16 +44,17 @@ When creating a new release:
 
 ## [Unreleased]
 
+## [1.0.0] - 2025-12-07
+
+Initial release of nix-s3-cache.
+
 ### Added
 
-### Changed
+- GitHub Action for configuring Nix to use S3-compatible storage as a binary cache
+- Support for AWS S3, Cloudflare R2, Tebi, and other S3-compatible providers
+- Read-only and read-write cache modes
+- AWS OIDC authentication support
+- Optional automatic bucket creation
 
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
-
-[Unreleased]: https://github.com/lemmih/nix-s3-cache/commits/HEAD
+[Unreleased]: https://github.com/lemmih/nix-s3-cache/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/lemmih/nix-s3-cache/releases/tag/v1.0.0
