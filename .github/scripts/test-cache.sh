@@ -56,8 +56,10 @@ if [[ -z "$S3_ENDPOINT" ]] || [[ -z "$BUCKET" ]]; then
 fi
 
 # Build S3 URL for nix commands
+# For AWS, we need to include the region
+AWS_REGION="${AWS_DEFAULT_REGION:-${AWS_REGION:-us-east-1}}"
 if [[ "$S3_ENDPOINT" == "s3.amazonaws.com" || "$S3_ENDPOINT" == s3.*.amazonaws.com ]]; then
-  NIX_S3_URL="s3://${BUCKET}"
+  NIX_S3_URL="s3://${BUCKET}?region=${AWS_REGION}"
   AWS_ENDPOINT_ARG=""
 else
   NIX_S3_URL="s3://${BUCKET}?endpoint=${S3_ENDPOINT}"
@@ -67,22 +69,25 @@ fi
 # Create a unique slow derivation that won't be in any cache
 DERIVATION_NAME="nix-s3-cache-test-${RUN_ID}"
 
+# Write a temporary nix file for the derivation to avoid shell quoting issues
+DERIVATION_FILE=$(mktemp --suffix=.nix)
+trap 'rm -f "$DERIVATION_FILE"' EXIT
+
+cat >"$DERIVATION_FILE" <<EOF
+derivation {
+  name = "${DERIVATION_NAME}";
+  system = builtins.currentSystem;
+  builder = "/bin/sh";
+  args = [ "-c" "sleep ${SLEEP_DURATION} && echo test-output > \$out" ];
+}
+EOF
+
 build_slow_derivation() {
   log_info "Building slow derivation '${DERIVATION_NAME}' (takes ${SLEEP_DURATION}s)..."
   local start_time end_time duration
 
   start_time=$(date +%s)
-  nix build --impure --no-link --print-out-paths --expr "
-    derivation {
-      name = \"${DERIVATION_NAME}\";
-      system = builtins.currentSystem;
-      builder = \"/bin/sh\";
-      args = [ \"-c\" ''
-        sleep ${SLEEP_DURATION}
-        echo 'Test derivation for run ${RUN_ID}' > \$out
-      '' ];
-    }
-  "
+  nix build --impure --no-link --print-out-paths --file "$DERIVATION_FILE"
   end_time=$(date +%s)
   duration=$((end_time - start_time))
 
@@ -91,25 +96,14 @@ build_slow_derivation() {
 }
 
 get_store_path() {
-  nix build --impure --no-link --print-out-paths --expr "
-    derivation {
-      name = \"${DERIVATION_NAME}\";
-      system = builtins.currentSystem;
-      builder = \"/bin/sh\";
-      args = [ \"-c\" ''
-        sleep ${SLEEP_DURATION}
-        echo 'Test derivation for run ${RUN_ID}' > \$out
-      '' ];
-    }
-  "
+  nix build --impure --no-link --print-out-paths --file "$DERIVATION_FILE"
 }
 
 # Test 1: Build and upload to cache
 test_build_and_upload() {
   log_info "=== Test 1: Build and Upload ==="
 
-  local store_path
-  store_path=$(build_slow_derivation)
+  build_slow_derivation
 
   # Wait for post-build hook to complete upload
   log_info "Waiting for upload to complete..."
@@ -167,11 +161,27 @@ test_cache_fetch_timing() {
   store_path=$(get_store_path)
 
   log_info "Deleting path from local store: ${store_path}"
-  sudo nix store delete "${store_path}" 2>/dev/null || true
 
-  # Verify it's gone
-  if nix path-info "${store_path}" 2>/dev/null; then
-    log_error "Failed to delete path from local store"
+  # Use nix-store --delete which works better than nix store delete
+  # Also need to remove GC roots first
+  sudo nix-store --delete "${store_path}" 2>/dev/null || true
+
+  # Double check with nix store gc for this specific path
+  sudo nix store gc 2>/dev/null || true
+
+  # Give daemon time to update
+  sleep 1
+
+  # Verify it's gone by checking if we can stat it
+  if [[ -e "${store_path}" ]]; then
+    log_info "Warning: Path still exists, trying harder to remove..."
+    # Try to invalidate by removing from database
+    sudo nix-store --delete --ignore-liveness "${store_path}" 2>/dev/null || true
+  fi
+
+  # Check if the path exists in local store
+  if [[ -e "${store_path}" ]]; then
+    log_error "Failed to delete path from local store (path still exists on filesystem)"
     return 1
   fi
 
@@ -179,17 +189,7 @@ test_cache_fetch_timing() {
   start_time=$(date +%s)
 
   # Rebuild - this should fetch from cache
-  nix build --impure --no-link --expr "
-    derivation {
-      name = \"${DERIVATION_NAME}\";
-      system = builtins.currentSystem;
-      builder = \"/bin/sh\";
-      args = [ \"-c\" ''
-        sleep ${SLEEP_DURATION}
-        echo 'Test derivation for run ${RUN_ID}' > \$out
-      '' ];
-    }
-  "
+  nix build --impure --no-link --file "$DERIVATION_FILE"
 
   end_time=$(date +%s)
   duration=$((end_time - start_time))
@@ -213,7 +213,7 @@ test_nix_copy_from_cache() {
   store_path=$(get_store_path)
 
   # Delete local path first
-  sudo nix store delete "${store_path}" 2>/dev/null || true
+  sudo nix-store --delete "${store_path}" 2>/dev/null || true
 
   log_info "Copying from cache: ${store_path}"
 
@@ -257,6 +257,7 @@ main() {
   log_info "Endpoint: ${S3_ENDPOINT}"
   log_info "Bucket: ${BUCKET}"
   log_info "Run ID: ${RUN_ID}"
+  log_info "S3 URL: ${NIX_S3_URL}"
   echo ""
 
   # Run tests
