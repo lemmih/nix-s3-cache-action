@@ -1,8 +1,16 @@
 # nix-s3-cache
 
-GitHub Action for caching Nix derivations with S3-compatible storage.
+Like Cachix - but without the steep price.
 
-Configures Nix to use an S3-backed cache for downloading and uploading derivations. Works with vanilla Nix and Determinate Nix.
+GitHub Action for caching Nix derivations with S3-compatible storage. Works with vanilla Nix and Determinate Nix.
+
+## S3 Providers with Free Tiers
+
+| Provider | Free Storage |
+|----------|--------------|
+| [Tebi](https://tebi.io/) | 25 GiB |
+| [Cloudflare R2](https://www.cloudflare.com/developer-platform/r2/) | 10 GiB |
+| [AWS S3](https://aws.amazon.com/s3/) | 5 GiB |
 
 ## Inputs
 
@@ -154,8 +162,4 @@ jobs:
       - run: nix build
 ```
 
-## Compatibility
 
-- **Vanilla Nix**: Appends to `/etc/nix/nix.conf`
-- **Determinate Nix**: Appends to `/etc/nix/nix.custom.conf`
-- **AWS Credentials**: Works with `aws-actions/configure-aws-credentials` for OIDC
