@@ -30,7 +30,7 @@ Each entry should:
 
 ```markdown
 ### Added
-- New caching strategy for improved performance ([#42](https://github.com/lemmih/nix-s3-cache/pull/42)) @contributor
+- New caching strategy for improved performance ([#42](https://github.com/lemmih/nix-s3-cache-action/pull/42)) @contributor
 ```
 
 ### Creating a Release
@@ -44,6 +44,12 @@ When creating a new release:
 
 ## [Unreleased]
 
+## [1.0.1] - 2025-12-07
+
+### Fixed
+
+- Update README references to new repo name `nix-s3-cache-action` ([#13](https://github.com/lemmih/nix-s3-cache-action/pull/13))
+
 ## [1.0.0] - 2025-12-07
 
 Initial release of nix-s3-cache.
@@ -56,5 +62,6 @@ Initial release of nix-s3-cache.
 - AWS OIDC authentication support
 - Optional automatic bucket creation
 
-[Unreleased]: https://github.com/lemmih/nix-s3-cache/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/lemmih/nix-s3-cache/releases/tag/v1.0.0
+[Unreleased]: https://github.com/lemmih/nix-s3-cache-action/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/lemmih/nix-s3-cache-action/releases/tag/v1.0.1
+[1.0.0]: https://github.com/lemmih/nix-s3-cache-action/releases/tag/v1.0.0
