@@ -27,7 +27,7 @@ inputs:
     required: false
 runs:
   using: 'composite'
-   steps:
+  steps:
     - name: Configure Nix for S3 cache
       shell: bash
       env:
