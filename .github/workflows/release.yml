@@ -1,0 +1,256 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*.*.*"
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+jobs:
+  # Comment on PRs that add a new version to CHANGELOG.md
+  detect-release:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+
+      - name: Checkout base branch for comparison
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      - name: Detect new version in CHANGELOG
+        id: detect
+        run: |
+          source .github/scripts/changelog.sh
+
+          NEW_VERSION=$(detect_new_version "CHANGELOG.md" "base/CHANGELOG.md")
+
+          if [[ -n "$NEW_VERSION" ]]; then
+            echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+            echo "has_release=true" >> "$GITHUB_OUTPUT"
+            echo "Detected new version: $NEW_VERSION"
+
+            NOTES=$(extract_release_notes "CHANGELOG.md" "$NEW_VERSION")
+            echo "$NOTES" > /tmp/release_notes.md
+          else
+            echo "has_release=false" >> "$GITHUB_OUTPUT"
+            echo "No new version detected"
+          fi
+
+      - name: Find existing comment
+        if: steps.detect.outputs.has_release == 'true'
+        uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3.1.0
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: github-actions[bot]
+          body-includes: "<!-- release-preview -->"
+
+      - name: Build comment body
+        if: steps.detect.outputs.has_release == 'true'
+        id: comment-body
+        run: |
+          VERSION="${{ steps.detect.outputs.new_version }}"
+          MAJOR_VERSION="${VERSION%%.*}"
+          NOTES=$(cat /tmp/release_notes.md)
+
+          {
+            echo "body<<EOF"
+            echo "<!-- release-preview -->"
+            echo "## Release Preview"
+            echo ""
+            echo "This PR will create **v${VERSION}** when merged."
+            echo ""
+            echo "### What will happen"
+            echo "- Tag \`v${VERSION}\` will be created"
+            echo "- A GitHub Release will be published"
+            echo "- The major version tag \`v${MAJOR_VERSION}\` will be updated"
+            echo ""
+            echo "### Release Notes Preview"
+            echo ""
+            if [[ -n "$NOTES" ]]; then
+              echo "$NOTES"
+            else
+              echo "_No release notes found for this version._"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create or update comment
+        if: steps.detect.outputs.has_release == 'true'
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4.0.0
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: ${{ steps.comment-body.outputs.body }}
+          edit-mode: replace
+
+  # Create a release when a commit with a new CHANGELOG version is pushed to main
+  create-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect new version in CHANGELOG
+        id: detect
+        run: |
+          source .github/scripts/changelog.sh
+
+          # Get CHANGELOG from parent commit for comparison
+          git show HEAD^:CHANGELOG.md > /tmp/changelog_parent.md 2>/dev/null || true
+
+          NEW_VERSION=$(detect_new_version "CHANGELOG.md" "/tmp/changelog_parent.md")
+
+          if [[ -n "$NEW_VERSION" ]]; then
+            {
+              echo "new_version=$NEW_VERSION"
+              echo "new_tag=v$NEW_VERSION"
+              echo "has_release=true"
+            } >> "$GITHUB_OUTPUT"
+            echo "Detected new version: $NEW_VERSION"
+          else
+            echo "has_release=false" >> "$GITHUB_OUTPUT"
+            echo "No new version detected, skipping release"
+          fi
+
+      - name: Extract release notes from CHANGELOG
+        if: steps.detect.outputs.has_release == 'true'
+        run: |
+          source .github/scripts/changelog.sh
+
+          VERSION="${{ steps.detect.outputs.new_version }}"
+          NOTES=$(extract_release_notes "CHANGELOG.md" "$VERSION")
+
+          # Remove empty lines and provide default if empty
+          NOTES=$(echo "$NOTES" | sed '/^[[:space:]]*$/d')
+          if [[ -z "$NOTES" ]]; then
+            NOTES="Release v${VERSION}"
+          fi
+
+          echo "$NOTES" > /tmp/release_notes.md
+          echo "Release notes:"
+          cat /tmp/release_notes.md
+
+      - name: Create and push tag
+        if: steps.detect.outputs.has_release == 'true'
+        run: |
+          TAG="${{ steps.detect.outputs.new_tag }}"
+
+          # Check if tag already exists
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub Release
+        if: steps.detect.outputs.has_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.detect.outputs.new_tag }}"
+
+          # Check if release already exists
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, skipping"
+            exit 0
+          fi
+
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file /tmp/release_notes.md
+
+  # Update major version tag when a semver tag is pushed
+  update-major-tag:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update major version tag
+        run: |
+          set -euo pipefail
+
+          # Extract version from the pushed tag (e.g., v1.2.3 -> 1.2.3)
+          PUSHED_TAG="${GITHUB_REF#refs/tags/}"
+          PUSHED_VERSION="${PUSHED_TAG#v}"
+
+          # Extract major version (e.g., 1.2.3 -> v1)
+          MAJOR_TAG="v${PUSHED_VERSION%%.*}"
+
+          echo "Pushed tag: $PUSHED_TAG"
+          echo "Major tag: $MAJOR_TAG"
+
+          # Function to compare semantic versions
+          # Returns 0 if $1 > $2, 1 otherwise
+          version_gt() {
+            local v1_major v1_minor v1_patch v2_major v2_minor v2_patch
+            IFS='.' read -r v1_major v1_minor v1_patch <<< "$1"
+            IFS='.' read -r v2_major v2_minor v2_patch <<< "$2"
+
+            # Default to 0 if empty
+            v1_minor=${v1_minor:-0}
+            v1_patch=${v1_patch:-0}
+            v2_minor=${v2_minor:-0}
+            v2_patch=${v2_patch:-0}
+
+            if (( v1_major > v2_major )); then return 0; fi
+            if (( v1_major < v2_major )); then return 1; fi
+            if (( v1_minor > v2_minor )); then return 0; fi
+            if (( v1_minor < v2_minor )); then return 1; fi
+            if (( v1_patch > v2_patch )); then return 0; fi
+            return 1
+          }
+
+          # Check if major tag exists
+          if git rev-parse "$MAJOR_TAG" >/dev/null 2>&1; then
+            # Get the version that the major tag currently points to
+            CURRENT_TAG=$(git describe --tags --exact-match "$MAJOR_TAG" 2>/dev/null || echo "")
+
+            if [[ -z "$CURRENT_TAG" ]] || [[ "$CURRENT_TAG" = "$MAJOR_TAG" ]]; then
+              # Major tag points directly to a commit, find the highest matching tag
+              CURRENT_VERSION=$(git tag -l "v${PUSHED_VERSION%%.*}.*.*" | sed 's/^v//' | sort -V | tail -1)
+            else
+              CURRENT_VERSION="${CURRENT_TAG#v}"
+            fi
+
+            echo "Current highest version for $MAJOR_TAG: $CURRENT_VERSION"
+
+            if version_gt "$PUSHED_VERSION" "$CURRENT_VERSION"; then
+              echo "Pushed version $PUSHED_VERSION is greater than $CURRENT_VERSION"
+              echo "Updating $MAJOR_TAG to point to $PUSHED_TAG"
+              git tag -f "$MAJOR_TAG" "$PUSHED_TAG"
+              git push origin "$MAJOR_TAG" --force
+            else
+              echo "Pushed version $PUSHED_VERSION is not greater than $CURRENT_VERSION"
+              echo "Skipping major tag update"
+            fi
+          else
+            echo "Major tag $MAJOR_TAG does not exist, creating it"
+            git tag "$MAJOR_TAG" "$PUSHED_TAG"
+            git push origin "$MAJOR_TAG"
+          fi
