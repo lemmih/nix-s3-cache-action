@@ -44,6 +44,12 @@ When creating a new release:
 
 ## [Unreleased]
 
+## [1.0.2] - 2025-12-08
+
+### Fixed
+
+- Fix major version tag not being updated after automated releases ([#17](https://github.com/lemmih/nix-s3-cache-action/pull/17))
+
 ## [1.0.1] - 2025-12-07
 
 ### Fixed
@@ -62,6 +68,7 @@ Initial release of nix-s3-cache.
 - AWS OIDC authentication support
 - Optional automatic bucket creation
 
-[Unreleased]: https://github.com/lemmih/nix-s3-cache-action/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/lemmih/nix-s3-cache-action/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/lemmih/nix-s3-cache-action/releases/tag/v1.0.2
 [1.0.1]: https://github.com/lemmih/nix-s3-cache-action/releases/tag/v1.0.1
 [1.0.0]: https://github.com/lemmih/nix-s3-cache-action/releases/tag/v1.0.0
