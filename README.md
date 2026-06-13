@@ -38,6 +38,12 @@ There are other great caching solutions out there:
 | `region` | No | Falls back to `AWS_DEFAULT_REGION`, `AWS_REGION`, or `us-east-1` |
 | `create-bucket` | No | Create bucket if it doesn't exist (default: `false`) |
 
+## Failure Behavior and Secret Files
+
+Cache uploads run from Nix's post-build hook. Upload failures are reported as warnings, but they do not fail the build or test command that produced the store paths.
+
+The action writes the cache signing key, AWS environment file, AWS credentials file, and post-build hook as root-owned files with restrictive permissions. AWS credentials are stored in `/etc/nix/s3-cache.env` and sourced by the hook instead of being embedded directly in the hook script.
+
 ## Generating Cache Keys
 
 ```bash
