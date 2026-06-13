@@ -46,7 +46,9 @@ When creating a new release:
 
 ## [1.0.3] - 2026-06-13
 
-No user-facing changes.
+### Fixed
+
+- Harden cache hook setup by storing cache signing keys, AWS credentials, and generated hook files with restrictive root-owned permissions, moving AWS environment exports to `/etc/nix/s3-cache.env`, warning instead of failing builds on transient post-build `nix copy` upload errors, and preventing duplicate managed Nix config entries across repeated action runs ([#21](https://github.com/lemmih/nix-s3-cache-action/pull/21)).
 
 ## [1.0.2] - 2025-12-08
 
