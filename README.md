@@ -20,7 +20,7 @@ There are other great caching solutions out there:
 
 | Provider | Free Storage |
 |----------|--------------|
-| [Tebi](https://tebi.io/) | 25 GiB |
+| [Backblaze B2](https://www.backblaze.com/cloud-storage) | 10 GiB |
 | [Cloudflare R2](https://www.cloudflare.com/developer-platform/r2/) | 10 GiB |
 | [AWS S3](https://aws.amazon.com/s3/) | 5 GiB |
 
@@ -157,7 +157,7 @@ jobs:
 
 R2 credentials are generated in Cloudflare Dashboard > R2 > Manage R2 API Tokens.
 
-### Tebi
+### Backblaze B2
 
 ```yaml
 jobs:
@@ -170,12 +170,15 @@ jobs:
 
       - uses: lemmih/nix-s3-cache-action@main
         with:
-          s3-endpoint: s3.tebi.io
+          s3-endpoint: s3.us-west-004.backblazeb2.com
           bucket: nix-cache
-          aws-access-key-id: ${{ secrets.TEBI_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.TEBI_SECRET_KEY }}
+          region: us-west-004
+          aws-access-key-id: ${{ secrets.B2_APPLICATION_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.B2_APPLICATION_KEY }}
           public-key: my-cache:BASE64PUBLIC...
           private-key: ${{ secrets.NIX_CACHE_PRIVATE_KEY }}
 
       - run: nix build
 ```
+
+Use the S3 endpoint shown for your Backblaze B2 bucket, and set `region` to the region in that endpoint.
