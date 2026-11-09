@@ -66,8 +66,10 @@ fi
 DERIVATION_NAME="nix-s3-cache-test-${RUN_ID}"
 
 # Write a temporary nix file for the derivation to avoid shell quoting issues
-DERIVATION_FILE=$(mktemp --suffix=.nix)
-trap 'rm -f "$DERIVATION_FILE"' EXIT
+# BSD mktemp has no --suffix option, so put the file in a temporary directory.
+DERIVATION_DIR=$(mktemp -d)
+DERIVATION_FILE="$DERIVATION_DIR/test.nix"
+trap 'rm -rf "$DERIVATION_DIR"' EXIT
 
 # Create a simple unique derivation
 cat >"$DERIVATION_FILE" <<EOF

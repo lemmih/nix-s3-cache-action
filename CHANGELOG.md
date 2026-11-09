@@ -44,6 +44,16 @@ When creating a new release:
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-11-09
+
+### Fixed
+
+- Support macOS runners: use the group of root (`wheel` on macOS), the home of root (`/var/root` on macOS), a temporary file instead of `/dev/stdin` for BSD `install`, and `launchctl` to restart the Nix daemon. Skip the bucket check with a warning when the AWS CLI is not installed.
+
+### Changed
+
+- Run the R2 cache test on `macos-15` as well as `ubuntu-24.04`.
+
 ## [1.0.3] - 2026-06-13
 
 ### Fixed

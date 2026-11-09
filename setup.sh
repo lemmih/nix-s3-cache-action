@@ -14,11 +14,21 @@ else
   CONFIG_FILE="/etc/nix/nix.conf"
 fi
 
+# The group of root is "root" on Linux and "wheel" on macOS. The home of
+# root is /root on Linux and /var/root on macOS.
+ROOT_GROUP="$(id -gn root)"
+ROOT_HOME="$(eval echo "~root")"
+
 install_root_file() {
   local mode="$1"
   local path="$2"
+  local tmp
 
-  sudo install -o root -g root -m "$mode" /dev/stdin "$path"
+  # BSD install does not read /dev/stdin, so copy stdin to a file first.
+  tmp="$(mktemp)"
+  cat >"$tmp"
+  sudo install -o root -g "$ROOT_GROUP" -m "$mode" "$tmp" "$path"
+  rm -f "$tmp"
 }
 
 write_env_export() {
@@ -48,7 +58,7 @@ else
 fi
 
 if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
-  sudo install -d -o root -g root -m 700 /root/.aws
+  sudo install -d -o root -g "$ROOT_GROUP" -m 700 "$ROOT_HOME/.aws"
   {
     printf '%s\n' \
       '[default]' \
@@ -58,7 +68,7 @@ if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
     if [ -n "$AWS_SESSION_TOKEN" ]; then
       printf '%s\n' "aws_session_token = ${AWS_SESSION_TOKEN}"
     fi
-  } | install_root_file 600 /root/.aws/credentials
+  } | install_root_file 600 "$ROOT_HOME/.aws/credentials"
 
   # Export for AWS CLI usage
   export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION
@@ -67,22 +77,26 @@ if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
   fi
 
   # Check if bucket exists
-  # shellcheck disable=SC2086 # Word splitting is intentional for ENDPOINT_URL_ARG
-  if ! aws s3 ls "s3://${INPUT_BUCKET}/" $ENDPOINT_URL_ARG >/dev/null 2>&1; then
-    if [ "$INPUT_CREATE_BUCKET" = "true" ]; then
-      echo "Bucket '${INPUT_BUCKET}' does not exist. Creating..."
-      # shellcheck disable=SC2086 # Word splitting is intentional for ENDPOINT_URL_ARG
-      aws s3 mb "s3://${INPUT_BUCKET}" $ENDPOINT_URL_ARG
-    else
-      echo "Error: S3 bucket '${INPUT_BUCKET}' does not exist or is not accessible with the provided credentials."
-      exit 1
+  if ! command -v aws >/dev/null 2>&1; then
+    echo "Warning: the AWS CLI is not installed, so the bucket check is skipped." >&2
+  else
+    # shellcheck disable=SC2086 # Word splitting is intentional for ENDPOINT_URL_ARG
+    if ! aws s3 ls "s3://${INPUT_BUCKET}/" $ENDPOINT_URL_ARG >/dev/null 2>&1; then
+      if [ "$INPUT_CREATE_BUCKET" = "true" ]; then
+        echo "Bucket '${INPUT_BUCKET}' does not exist. Creating..."
+        # shellcheck disable=SC2086 # Word splitting is intentional for ENDPOINT_URL_ARG
+        aws s3 mb "s3://${INPUT_BUCKET}" $ENDPOINT_URL_ARG
+      else
+        echo "Error: S3 bucket '${INPUT_BUCKET}' does not exist or is not accessible with the provided credentials."
+        exit 1
+      fi
     fi
   fi
 fi
 
-if sudo test -f /root/.aws/credentials; then
-  sudo chown root:root /root/.aws/credentials
-  sudo chmod 600 /root/.aws/credentials
+if sudo test -f "$ROOT_HOME/.aws/credentials"; then
+  sudo chown "root:$ROOT_GROUP" "$ROOT_HOME/.aws/credentials"
+  sudo chmod 600 "$ROOT_HOME/.aws/credentials"
 fi
 
 # Create signing key file if provided
@@ -122,12 +136,12 @@ fi
     'fi'
 } | install_root_file 700 /etc/nix/post-build-hook.sh
 
-sudo chown root:root /etc/nix/post-build-hook.sh
+sudo chown "root:$ROOT_GROUP" /etc/nix/post-build-hook.sh
 sudo chmod 700 /etc/nix/post-build-hook.sh
-sudo chown root:root /etc/nix/s3-cache.env
+sudo chown "root:$ROOT_GROUP" /etc/nix/s3-cache.env
 sudo chmod 600 /etc/nix/s3-cache.env
 if [ -n "$INPUT_PRIVATE_KEY" ]; then
-  sudo chown root:root /etc/nix/cache-priv-key.pem
+  sudo chown "root:$ROOT_GROUP" /etc/nix/cache-priv-key.pem
   sudo chmod 600 /etc/nix/cache-priv-key.pem
 fi
 
@@ -153,8 +167,16 @@ extra-trusted-public-keys = ${INPUT_PUBLIC_KEY}
 post-build-hook = /etc/nix/post-build-hook.sh
 # END nix-s3-cache-action
 EOF
-sudo install -o root -g root -m 644 "$TMP_CONFIG" "$CONFIG_FILE"
+sudo install -o root -g "$ROOT_GROUP" -m 644 "$TMP_CONFIG" "$CONFIG_FILE"
 rm -f "$TMP_CONFIG"
 
-# Restart nix-daemon
-sudo systemctl restart nix-daemon || true
+# Restart nix-daemon so that it reads the new configuration. Linux uses
+# systemd. macOS uses launchd, with the Determinate Nix label first and the
+# upstream Nix label second.
+if command -v systemctl >/dev/null 2>&1; then
+  sudo systemctl restart nix-daemon || true
+elif [ "$(uname -s)" = "Darwin" ]; then
+  sudo launchctl kickstart -k system/systems.determinate.nix-daemon 2>/dev/null ||
+    sudo launchctl kickstart -k system/org.nixos.nix-daemon ||
+    true
+fi
